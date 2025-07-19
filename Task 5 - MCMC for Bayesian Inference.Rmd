@@ -1,0 +1,145 @@
+---
+title: "Task 5 - MCMC for Bayesian Inference"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(tidyverse)
+library(readxl)
+library(boot)
+library(bootstrap)
+library(ash)
+library(fitdistrplus)
+library(mixtools)
+library(rstanarm)
+library(brms)
+library(coda)
+library(bayesplot)
+
+set.seed(12345)
+
+salary_df <- read_csv("Salary_Data.csv")
+```
+
+
+```{r MCMC setup}
+years_exp <- salary_df$YearsExperience
+salary <- salary_df$Salary
+n <- length(salary)
+
+#years_exp_std <- scale(years_exp)[,1]
+X <- cbind(1, years_exp) 
+
+beta0_prior_mean <- mean(salary)
+beta0_prior_var <- (15000)^2
+beta1_prior_mean <- 0         
+beta1_prior_var <- (1500)^2  
+sigma2_prior_a <- 2              
+sigma2_prior_b <- 10000    
+
+log_posterior <- function(params, y, X) {
+  beta0 <- params[1]
+  beta1 <- params[2]
+  sigma2 <- params[3]
+  
+  if (sigma2 <= 0) return(-Inf) 
+  
+  mu <- X %*% c(beta0, beta1)
+  log_lik <- sum(dnorm(y, mu, sqrt(sigma2), log = TRUE))
+  
+  # Priors
+  log_prior_beta0 <- dnorm(beta0, beta0_prior_mean, sqrt(beta0_prior_var), log = TRUE)
+  log_prior_beta1 <- dnorm(beta1, beta1_prior_mean, sqrt(beta1_prior_var), log = TRUE)
+  log_prior_sigma2 <- dgamma(1/sigma2, sigma2_prior_a, sigma2_prior_b, log = TRUE) - 2*log(sigma2)
+  
+  return(log_lik + log_prior_beta0 + log_prior_beta1 + log_prior_sigma2)
+}
+
+metropolis_hastings <- function(n_iter, y, X, initial_values, proposal_sd) {
+  n_params <- length(initial_values)
+  samples <- matrix(0, n_iter, n_params)
+  current <- initial_values
+  n_accepted <- 0
+  
+  for (i in 1:n_iter) {
+    proposal <- current + rnorm(n_params, 0, proposal_sd)
+    
+    log_ratio <- log_posterior(proposal, y, X) - log_posterior(current, y, X)
+    if (log(runif(1)) < log_ratio) {
+      current <- proposal
+      n_accepted <- n_accepted + 1
+    }
+    
+    samples[i, ] <- current
+  }
+  
+  cat("Metropolis-Hastings acceptance rate:", n_accepted / n_iter, "\n")
+  return(samples)
+}
+
+```
+
+```{r}
+n_iter <- 10000
+burn_in <- 2000
+initial_values <- c(mean(salary), 0, var(salary))
+proposal_sd <- c(10000, 2000, 500)
+
+mh_samples <- metropolis_hastings(n_iter, salary, X, initial_values, proposal_sd)
+mh_samples_post_burnin <- mh_samples[(burn_in+1):n_iter, ]
+mh_samples_post_burnin[, 3] <- sqrt(mh_samples_post_burnin[, 3]) 
+
+```
+
+```{r summary statistics}
+mh_mcmc <- mcmc(mh_samples_post_burnin)
+summary(mh_mcmc)
+cat("\nEffective Sample Size for each variable\n")
+effectiveSize(mh_mcmc)
+```
+
+
+
+### Plots
+
+
+```{r trace plot}
+plot(1:length(mh_samples_post_burnin[,1]), mh_samples_post_burnin[,1], type = "l", ylab="y values", xlab="iteration", main = "Trace Plot of Intercept")
+
+plot(1:length(mh_samples_post_burnin[,2]), mh_samples_post_burnin[,2], type = "l", ylab="y values", xlab="iteration", main = "Trace Plot of Slope")
+
+plot(1:length(mh_samples_post_burnin[,3]), mh_samples_post_burnin[,3], type = "l", ylab="y values", xlab="iteration", main = "Trace Plot of standard deviation")
+```
+
+
+
+
+
+
+
+
+
+
+```{r univariate plots setup}
+mh_bayes_samples_fin <- as.array(mh_samples_post_burnin)
+
+dimnames(mh_bayes_samples_fin) <- list(1:nrow(mh_bayes_samples_fin), c("Intercept", "Slope", "sd"))
+
+```
+
+```{r univariate plots mcmc, fig.width=15, fig.height=6}
+mcmc_hist(mh_bayes_samples_fin, pars = c("Intercept", "Slope", "sd"))
+```
+
+
+```{r mcmc hexbin}
+# bivariate marginal posterior distribution
+
+if (requireNamespace("hexbin", quietly = TRUE)) {
+  mcmc_hex(mh_bayes_samples_fin, pars = c("Intercept", "Slope"))
+}
+```
