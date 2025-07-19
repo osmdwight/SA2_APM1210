@@ -1,0 +1,171 @@
+---
+title: "Task 4 - Permutation"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(tidyverse)
+library(readxl)
+library(boot)
+library(bootstrap)
+library(ash)
+library(fitdistrplus)
+library(mixtools)
+
+set.seed(12345)
+
+salary_df <- read_csv("Salary_Data.csv")
+```
+
+
+Permutation
+
+
+We can see the distribution of the Age of Experience here.
+
+```{r histogram sal, echo=FALSE}
+hist(salary_df$YearsExperience, breaks = "Sturges", freq = FALSE, main = "Histogram of Years of Experience", xlab="Years of Experience")
+```
+
+
+Seeing as there are two peaks, the distribution might be a mixture. Let's fit two normal distributions.
+
+```{r mixtools, echo=FALSE}
+
+exp <- normalmixEM(salary_df$YearsExperience, fast = TRUE)
+```
+
+```{r}
+plot(exp, density = TRUE)
+```
+
+```{r mixture capture stats}
+cat("Mixture Log Likelihood:", exp$loglik,"\n")
+cat("First Normal Distribution proportion:", exp$lambda[1], ", Mean:",exp$mu[1], ", and Standard Deviation:",exp$sigma[1]  )
+cat("\nSecond Normal Distribution proportion:", exp$lambda[2], ", Mean:",exp$mu[2], ", and Standard Deviation:",exp$sigma[2]  )
+```
+
+Now, let's fit try fitting just one theoretical distribution
+
+```{r describe distribution}
+descdist(salary_df$YearsExperience, discrete = FALSE)
+```
+
+```{r fitting one distribution}
+fit.weibull <- fitdist(salary_df$YearsExperience, "weibull")
+fit.norm <- fitdist(salary_df$YearsExperience, "norm")
+
+```
+
+
+```{r plot fitted distributions}
+plot(fit.weibull)
+plot(fit.norm)
+hist(salary_df$Salary, breaks = "Sturges", freq = FALSE)
+```
+
+```{r aic of fit}
+cat("Fitted Weibull AIC:",fit.weibull$aic )
+cat("Fitted Normal AIC:", fit.norm$aic )
+```
+
+
+
+The Weibull distribution seems to explain our sample better, in the case of fitting one distribution.
+
+
+The estimated parameters are:
+```{r}
+fit.weibull$estimate
+```
+
+
+
+## Weibull Permutation Testing
+
+```{r creating weibull sample}
+weibull.samp <- rweibull(30, shape = fit.weibull$estimate["shape"], scale = fit.weibull$estimate["scale"])
+
+```
+
+
+```{r weibull ks test, echo=FALSE}
+weibull.ks.test.initial <- ks.test(salary_df$YearsExperience, weibull.samp)
+
+cat("The p-value of the initial Kolmogorov-Smirnov test is:", weibull.ks.test.initial$p.value)
+weibull.ks.test.D0 <- weibull.ks.test.initial$statistic
+cat("\nThe Test Statistic is:", weibull.ks.test.D0)
+```
+
+
+
+```{r weibull ks permutation, include=FALSE}
+
+B <- 10000
+Z <- c(salary_df$YearsExperience, weibull.samp)
+K <- 1:60
+D <- numeric(B) 
+
+options(warn = -1)
+
+for (i in 1:B) {
+
+k <- sample(K, size = 30, replace = FALSE)
+x1 <- Z[k]
+y1 <- Z[-k] #complement of x1
+D[i] <- ks.test(x1, y1, exact = FALSE)$statistic
+}
+
+p <- mean(c(weibull.ks.test.D0, D) >= weibull.ks.test.D0)
+options(warn = 0)
+```
+```{r, echo=FALSE}
+cat("The obtained ASL is:", p)
+hist(D, freq = FALSE, main = "Histogram of fitted Weilbull vs Original Sample KS test statistic", xlab="test statistic")
+```
+
+
+## Mixed Normal Distribution Permutation Testing
+
+```{r creating mix norm sample}
+
+N <- 30
+sample_idx <- sample(1:2, prob = exp$lambda, size = N, replace = TRUE)
+mixnorm.samp <- rnorm(N, mean = exp$mu[sample_idx], sd = exp$sigma[sample_idx])
+
+```
+```{r ks test mix norm}
+mixnorm.ks.test.initial <- ks.test(salary_df$YearsExperience, mixnorm.samp)
+
+cat("The p-value of the initial Kolmogorov-Smirnov test is:", mixnorm.ks.test.initial$p.value)
+mixnorm.ks.test.D0 <- mixnorm.ks.test.initial$statistic
+cat("\nThe Test Statistic is:", mixnorm.ks.test.D0)
+```
+
+```{r mix norm perm test, include=FALSE}
+B <- 10000
+Z <- c(salary_df$YearsExperience, mixnorm.samp)
+K <- 1:60
+D <- numeric(B) 
+
+options(warn = -1)
+
+for (i in 1:B) {
+
+k <- sample(K, size = 30, replace = FALSE)
+x1 <- Z[k]
+y1 <- Z[-k] #complement of x1
+D[i] <- ks.test(x1, y1, exact = FALSE)$statistic
+}
+
+p <- mean(c(mixnorm.ks.test.D0, D) >= mixnorm.ks.test.D0)
+options(warn = 0)
+```
+```{r, echo=FALSE}
+cat("The obtained ASL is:", p)
+hist(D, freq = FALSE, main = "Histogram of fitted Normal Mixture vs Original Sample KS test statistic", xlab="test statistic")
+```
