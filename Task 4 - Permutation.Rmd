@@ -22,14 +22,20 @@ salary_df <- read_csv("Salary_Data.csv")
 ```
 
 
-Permutation
+# Permutation
 
 
-We can see the distribution of the Age of Experience here.
+## Histogram of Years of Experience
+
 
 ```{r histogram sal, echo=FALSE}
 hist(salary_df$YearsExperience, breaks = "Sturges", freq = FALSE, main = "Histogram of Years of Experience", xlab="Years of Experience")
 ```
+
+
+
+
+## Fitting mixture distribution
 
 
 Seeing as there are two peaks, the distribution might be a mixture. Let's fit two normal distributions.
@@ -39,9 +45,14 @@ Seeing as there are two peaks, the distribution might be a mixture. Let's fit tw
 exp <- normalmixEM(salary_df$YearsExperience, fast = TRUE)
 ```
 
+
+
 ```{r}
 plot(exp, density = TRUE)
 ```
+
+
+
 
 ```{r mixture capture stats}
 cat("Mixture Log Likelihood:", exp$loglik,"\n")
@@ -49,11 +60,16 @@ cat("First Normal Distribution proportion:", exp$lambda[1], ", Mean:",exp$mu[1],
 cat("\nSecond Normal Distribution proportion:", exp$lambda[2], ", Mean:",exp$mu[2], ", and Standard Deviation:",exp$sigma[2]  )
 ```
 
+
+
+## Fitting one distribution
+
 Now, let's fit try fitting just one theoretical distribution
 
 ```{r describe distribution}
 descdist(salary_df$YearsExperience, discrete = FALSE)
 ```
+
 
 ```{r fitting one distribution}
 fit.weibull <- fitdist(salary_df$YearsExperience, "weibull")
@@ -68,11 +84,12 @@ plot(fit.norm)
 hist(salary_df$Salary, breaks = "Sturges", freq = FALSE)
 ```
 
+
+
 ```{r aic of fit}
 cat("Fitted Weibull AIC:",fit.weibull$aic )
 cat("Fitted Normal AIC:", fit.norm$aic )
 ```
-
 
 
 The Weibull distribution seems to explain our sample better, in the case of fitting one distribution.
@@ -82,7 +99,6 @@ The estimated parameters are:
 ```{r}
 fit.weibull$estimate
 ```
-
 
 
 ## Weibull Permutation Testing
@@ -145,6 +161,8 @@ cat("The p-value of the initial Kolmogorov-Smirnov test is:", mixnorm.ks.test.in
 mixnorm.ks.test.D0 <- mixnorm.ks.test.initial$statistic
 cat("\nThe Test Statistic is:", mixnorm.ks.test.D0)
 ```
+
+
 
 ```{r mix norm perm test, include=FALSE}
 B <- 10000
