@@ -5,6 +5,9 @@ The dataset used for this project can be accessed with: https://www.kaggle.com/d
 
 By:
 
-Dwight Gonzales - Task 2 and 3
-Mostafa Khafaji - Task 4 and 5
+Dwight Gonzales - Task 2 and 3;
+Mostafa Khafaji - Task 4 and 5;
 John Carlos Quintero - Task 3 and 6
+
+
+Written Output can be accessed at:
