@@ -10,4 +10,4 @@ Mostafa Khafaji - Task 4 and 5;
 John Carlos Quintero - Task 3 and 6
 
 
-Written Output can be accessed at:
+Written Output can be accessed at: https://docs.google.com/document/d/1GjsUj6bRdQckutHDLN2s3ft43nwGcqi5_rS76LKPUD0/edit?usp=sharing
